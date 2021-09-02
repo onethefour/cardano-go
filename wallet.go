@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/echovl/cardano-go/crypto"
+	"github.com/onethefour/cardano-go/crypto"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -27,6 +27,8 @@ type Wallet struct {
 	rootKey crypto.ExtendedSigningKey
 	node    cardanoNode
 	network Network
+	Utxos []Utxo
+	Tip NodeTip
 }
 
 func (w *Wallet) SetNetwork(net Network) {
@@ -84,12 +86,9 @@ func (w *Wallet) Transfer(receiver Address, amount uint64) error {
 	builder.AddOutput(receiver, amount)
 
 	// Calculate and set ttl
-	tip, err := w.node.QueryTip()
-	if err != nil {
-		return err
-	}
-	builder.SetTtl(tip.Slot + 1200)
+	tip := w.Tip
 
+	builder.SetTtl(tip.Slot + 1200)
 	changeAddress := pickedUtxos[0].Address
 	err = builder.AddFee(changeAddress)
 	if err != nil {
@@ -114,18 +113,12 @@ func (w *Wallet) Balance() (uint64, error) {
 	}
 	return balance, nil
 }
+func (w *Wallet) SetUtxos(utxos []Utxo){
+	w.Utxos = utxos
+}
 
 func (w *Wallet) findUtxos() ([]Utxo, error) {
-	addresses := w.Addresses()
-	walletUtxos := []Utxo{}
-	for _, addr := range addresses {
-		addrUtxos, err := w.node.QueryUtxos(addr)
-		if err != nil {
-			return nil, err
-		}
-		walletUtxos = append(walletUtxos, addrUtxos...)
-	}
-	return walletUtxos, nil
+	return w.Utxos,nil
 }
 
 // AddAddress generates a new payment address and adds it to the wallet.
@@ -150,6 +143,10 @@ func newWalletID() string {
 	return "wallet_" + id
 }
 
+func NewWallet(name, password string, entropy []byte) *Wallet {
+	return newWallet(name, password , entropy)
+}
+
 func newWallet(name, password string, entropy []byte) *Wallet {
 	wallet := &Wallet{Name: name, ID: newWalletID()}
 	rootKey := crypto.NewExtendedSigningKey(entropy, password)
@@ -162,6 +159,16 @@ func newWallet(name, password string, entropy []byte) *Wallet {
 	wallet.skeys = []crypto.ExtendedSigningKey{addr0Key}
 	return wallet
 }
+func (w *Wallet) SetKey(name, password string, entropy []byte) {
+	rootKey := crypto.NewExtendedSigningKey(entropy, password)
+	purposeKey := crypto.DeriveSigningKey(rootKey, purposeIndex)
+	coinKey := crypto.DeriveSigningKey(purposeKey, coinTypeIndex)
+	accountKey := crypto.DeriveSigningKey(coinKey, accountIndex)
+	chainKey := crypto.DeriveSigningKey(accountKey, externalChainIndex)
+	addr0Key := crypto.DeriveSigningKey(chainKey, 0)
+	w.skeys = append(w.skeys,addr0Key)
+}
+
 
 type walletDump struct {
 	ID      string
