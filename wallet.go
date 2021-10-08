@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/onethefour/cardano-go/crypto"
+	"github.com/echovl/cardano-go/crypto"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -27,14 +27,14 @@ type Wallet struct {
 	rootKey crypto.ExtendedSigningKey
 	node    cardanoNode
 	network Network
-	Utxos []Utxo
-	Tip NodeTip
 }
 
 func (w *Wallet) SetNetwork(net Network) {
 	w.network = net
 }
 
+// Transfer sends an amount of lovelace to the receiver address
+//TODO: remove hardcoded protocol parameters, these parameters must be obtained using the cardano node
 func (w *Wallet) Transfer(receiver Address, amount uint64) error {
 	// Calculate if the account has enough balance
 	balance, err := w.Balance()
@@ -86,9 +86,12 @@ func (w *Wallet) Transfer(receiver Address, amount uint64) error {
 	builder.AddOutput(receiver, amount)
 
 	// Calculate and set ttl
-	tip := w.Tip
-
+	tip, err := w.node.QueryTip()
+	if err != nil {
+		return err
+	}
 	builder.SetTtl(tip.Slot + 1200)
+
 	changeAddress := pickedUtxos[0].Address
 	err = builder.AddFee(changeAddress)
 	if err != nil {
@@ -113,12 +116,18 @@ func (w *Wallet) Balance() (uint64, error) {
 	}
 	return balance, nil
 }
-func (w *Wallet) SetUtxos(utxos []Utxo){
-	w.Utxos = utxos
-}
 
 func (w *Wallet) findUtxos() ([]Utxo, error) {
-	return w.Utxos,nil
+	addresses := w.Addresses()
+	walletUtxos := []Utxo{}
+	for _, addr := range addresses {
+		addrUtxos, err := w.node.QueryUtxos(addr)
+		if err != nil {
+			return nil, err
+		}
+		walletUtxos = append(walletUtxos, addrUtxos...)
+	}
+	return walletUtxos, nil
 }
 
 // AddAddress generates a new payment address and adds it to the wallet.
@@ -129,7 +138,7 @@ func (w *Wallet) AddAddress() Address {
 	return newEnterpriseAddress(newKey.ExtendedVerificationKey(), w.network)
 }
 
-// AddAddresses returns all wallet's addresss.
+// Addresses returns all wallet's addresss.
 func (w *Wallet) Addresses() []Address {
 	addresses := make([]Address, len(w.skeys))
 	for i, key := range w.skeys {
@@ -141,10 +150,6 @@ func (w *Wallet) Addresses() []Address {
 func newWalletID() string {
 	id, _ := gonanoid.Generate(walleIDAlphabet, 10)
 	return "wallet_" + id
-}
-
-func NewWallet(name, password string, entropy []byte) *Wallet {
-	return newWallet(name, password , entropy)
 }
 
 func newWallet(name, password string, entropy []byte) *Wallet {
@@ -159,16 +164,6 @@ func newWallet(name, password string, entropy []byte) *Wallet {
 	wallet.skeys = []crypto.ExtendedSigningKey{addr0Key}
 	return wallet
 }
-func (w *Wallet) SetKey(name, password string, entropy []byte) {
-	rootKey := crypto.NewExtendedSigningKey(entropy, password)
-	purposeKey := crypto.DeriveSigningKey(rootKey, purposeIndex)
-	coinKey := crypto.DeriveSigningKey(purposeKey, coinTypeIndex)
-	accountKey := crypto.DeriveSigningKey(coinKey, accountIndex)
-	chainKey := crypto.DeriveSigningKey(accountKey, externalChainIndex)
-	addr0Key := crypto.DeriveSigningKey(chainKey, 0)
-	w.skeys = append(w.skeys,addr0Key)
-}
-
 
 type walletDump struct {
 	ID      string
