@@ -37,9 +37,9 @@ func (c *Client) Close() {
 // CreateWallet creates a new Wallet using a secure entropy and password,
 // returning a Wallet with its corresponding 24 word mnemonic
 func (c *Client) CreateWallet(name, password string) (*Wallet, string, error) {
-	entropy := newEntropy(entropySizeInBits)
+	entropy := NewEntropy(entropySizeInBits)
 	mnemonic := crypto.NewMnemonic(entropy)
-	wallet := newWallet(name, password, entropy)
+	wallet := NewWallet(name, password, entropy)
 	wallet.node = c.node
 	err := c.db.SaveWallet(wallet)
 	if err != nil {
@@ -54,7 +54,7 @@ func (c *Client) RestoreWallet(name, password, mnemonic string) (*Wallet, error)
 	if err != nil {
 		return nil, err
 	}
-	wallet := newWallet(name, password, entropy)
+	wallet := NewWallet(name, password, entropy)
 	wallet.node = c.node
 	err = c.db.SaveWallet(wallet)
 	if err != nil {

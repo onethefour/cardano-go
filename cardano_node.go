@@ -33,8 +33,8 @@ type NodeTip struct {
 	Slot  uint64
 }
 
-type cardanoCli struct {
-	socketPath string
+type CardanoCli struct {
+	SocketPath string
 }
 
 type cardanoCliTip struct {
@@ -51,13 +51,27 @@ type cardanoCliTx struct {
 	CborHex     string `json:"cborHex"`
 }
 
-func newCli() *cardanoCli {
-	return &cardanoCli{}
+func newCli() *CardanoCli {
+	return &CardanoCli{}
+}
+
+func NewUtxo(txid string, address string,index uint64,amount uint64)(utxo Utxo,err error){
+	addr,err := Bech32ToAddress(address)
+	if err != nil {
+		return Utxo{}, err
+	}
+	utxo = Utxo{
+		Address: addr,
+		TxId: transactionID(txid),
+		Index: index,
+		Amount: amount,
+	}
+	return
 }
 
 //TODO: add ability to use mainnet and testnet
-func (cli *cardanoCli) QueryUtxos(address Address) ([]Utxo, error) {
-	out, err := runCommand("cardano-cli", "query", "utxo", "--address", string(address), "--testnet-magic", "1097911063")
+func (cli *CardanoCli) QueryUtxos(address Address) ([]Utxo, error) {
+	out, err := runCommand("cardano-cli", "query", "utxo", "--address", string(address), "--mainnet", "1097911063")
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +113,8 @@ func (cli *cardanoCli) QueryUtxos(address Address) ([]Utxo, error) {
 }
 
 //TODO: add ability to use mainnet and testnet
-func (cli *cardanoCli) QueryTip() (NodeTip, error) {
-	out, err := runCommand("cardano-cli", "query", "tip", "--testnet-magic", "1097911063")
+func (cli *CardanoCli) QueryTip() (NodeTip, error) {
+	out, err := runCommand("cardano-cli", "query", "tip", "--mainnet", "1097911063")
 	if err != nil {
 		return NodeTip{}, err
 	}
@@ -119,7 +133,7 @@ func (cli *cardanoCli) QueryTip() (NodeTip, error) {
 }
 
 //TODO: add ability to use mainnet and testnet
-func (cli *cardanoCli) SubmitTx(tx transaction) error {
+func (cli *CardanoCli) SubmitTx(tx transaction) error {
 	const txFileName = "txsigned.temp"
 	txPayload := cardanoCliTx{
 		Type:        "Tx MaryEra",
@@ -137,7 +151,7 @@ func (cli *cardanoCli) SubmitTx(tx transaction) error {
 		return err
 	}
 
-	out, err := runCommand("cardano-cli", "transaction", "submit", "--tx-file", txFileName, "--testnet-magic", "1097911063")
+	out, err := runCommand("cardano-cli", "transaction", "submit", "--tx-file", txFileName, "--mainnet", "1097911063")
 	fmt.Print(out.String())
 
 	err = os.Remove(txFileName)
@@ -157,4 +171,22 @@ func runCommand(cmd string, arg ...string) (*bytes.Buffer, error) {
 	}
 
 	return out, nil
+}
+
+type RpcNode struct{
+	Url string
+}
+func NewRpcNode(url string) *RpcNode{
+	return &RpcNode{
+		Url: url,
+	}
+}
+func (nd *RpcNode)QueryUtxos(Address) ([]Utxo, error){
+	return nil, nil
+}
+func (nd *RpcNode)QueryTip() (NodeTip, error){
+	return NodeTip{}, nil
+}
+func (nd *RpcNode)SubmitTx(transaction) error{
+	return nil
 }
