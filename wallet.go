@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/echovl/cardano-go/crypto"
+	"github.com/onethefour/cardano-go/crypto"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/tyler-smith/go-bip39"
 	"errors"

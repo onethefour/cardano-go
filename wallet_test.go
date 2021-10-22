@@ -2,7 +2,7 @@ package cardano
 
 import (
 	"encoding/hex"
-	"github.com/echovl/cardano-go/crypto"
+	"github.com/onethefour/cardano-go/crypto"
 	"io/ioutil"
 	"testing"
 
